@@ -1,0 +1,79 @@
+name: Build and Package Cross-Platform Executables
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: app-linux
+            binary_name: app-name
+            executable_path: target/x86_64-unknown-linux-gnu/release/app-name
+            out_name: app-name-linux
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: app-macos
+            binary_name: app-name
+            executable_path: target/x86_64-apple-darwin/release/app-name
+            out_name: app-name-macos
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: app-windows
+            binary_name: app-name.exe
+            executable_path: target/x86_64-pc-windows-msvc/release/app-name.exe
+            out_name: app-name-windows.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      # Rename binary before staging so files don't clash when combined
+      - name: Prepare binary artifact
+        shell: bash
+        run: |
+          mkdir -p staging
+          cp ${{ matrix.executable_path }} staging/${{ matrix.out_name }}
+
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: staging/${{ matrix.out_name }}
+          retention-days: 1
+
+  package:
+    name: Package All Binaries
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+          merge-multiple: true
+
+      - name: Create Zip Archive
+        run: |
+          zip -j rust-app-binaries.zip binaries/*
+
+      - name: Upload Single Zip Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-app-all-platforms
+          path: rust-app-binaries.zip
+          retention-days: 90
