@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  APP_NAME: ZMK Deck # Replace with your binary name from Cargo.toml
+  APP_NAME: zmk-deck # Replace with your binary name from Cargo.toml
 
 jobs:
   build-windows:
