@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
    let usagePage: u16 = 0xFF60;
    let usage: u16 = 0x61;
 
-   while(true){
+   loop{
       let keyboard = transport::KeyboardHid::connect(&api, vendorId, productId, usagePage, usage)?;
       println!("Keyboard connected. Listening for events...");
       keyboard.listen()?;

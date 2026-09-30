@@ -71,7 +71,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "zmk-manager-cli"
+name = "zmk-deck"
 version = "0.1.0"
 dependencies = [
  "hidapi",
