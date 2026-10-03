@@ -1,79 +1,70 @@
-name: Build and Package Cross-Platform Executables
+name: Build Tauri App
 
 on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
+  build-tauri:
+    permissions:
+      contents: read
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            artifact_name: app-linux
-            binary_name: app-name
-            executable_path: target/x86_64-unknown-linux-gnu/release/app-name
-            out_name: app-name-linux
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            artifact_name: app-macos
-            binary_name: app-name
-            executable_path: target/x86_64-apple-darwin/release/app-name
-            out_name: app-name-macos
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: app-windows
-            binary_name: app-name.exe
-            executable_path: target/x86_64-pc-windows-msvc/release/app-name.exe
-            out_name: app-name-windows.exe
+          - platform: 'ubuntu-22.04'
+            os_name: 'linux'
+            artifact_paths: 'src-tauri/target/release/bundle/appimage/*.AppImage'
+          - platform: 'windows-latest'
+            os_name: 'windows'
+            artifact_paths: |
+              src-tauri/target/release/bundle/nsis/*.exe
+              src-tauri/target/release/*.exe
+          - platform: 'macos-latest'
+            os_name: 'macos'
+            artifact_paths: 'src-tauri/target/release/bundle/macos/*.app'
+
+    runs-on: ${{ matrix.platform }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+
+      - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
-      - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      # Rename binary before staging so files don't clash when combined
-      - name: Prepare binary artifact
-        shell: bash
+      - name: Install Linux dependencies
+        if: matrix.os_name == 'linux'
         run: |
-          mkdir -p staging
-          cp ${{ matrix.executable_path }} staging/${{ matrix.out_name }}
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Upload platform artifact
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri Application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseDraft: false
+          prerelease: false
+          tagNamePattern: ""
+
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: staging/${{ matrix.out_name }}
-          retention-days: 1
-
-  package:
-    name: Package All Binaries
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: binaries
-          merge-multiple: true
-
-      - name: Create Zip Archive
-        run: |
-          zip -j rust-app-binaries.zip binaries/*
-
-      - name: Upload Single Zip Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-app-all-platforms
-          path: rust-app-binaries.zip
-          retention-days: 90
+          name: tauri-app-${{ matrix.os_name }}
+          path: ${{ matrix.artifact_paths }}
+          if-no-files-found: error
