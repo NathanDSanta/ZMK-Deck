@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "hello": {
+      "type": "print",
+      "message": "Hello from my keyboard!"
+    },
+    "open_browser": {
+      "type": "open_url",
+      "url": "https://www.google.com"
+    }
+  },
+  "buttons": {
+    "1": "hello",
+    "2": "open_browser"
+  }
+}
